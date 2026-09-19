@@ -1,14 +1,10 @@
 # Local Commit Guard
 
-**原始作者 Original author: [insistin](https://github.com/insistin)**  
-原始仓库: https://github.com/insistin/local-commit-guard  
-许可: [Apache License 2.0](LICENSE)（允许二次开发与分发，**必须保留原始作者署名与 NOTICE**）
-
 通用 Git 本地提交守卫：把「只想留在本机、不要提交」的目录或文件名加入黑名单。命中规则的路径无法进入 commit；其余路径正常提交。
 
 拉取（`git pull` / `git fetch`）**不拦截**，远程更新会进来。本机改动可先备份，冲突时再还原。
 
-适用于任意 Git 仓库，不绑定特定业务工程。Cursor、Trae、CodeBuddy 等 VS Code 兼容 IDE 均可从 VSIX 安装（优先保证 Cursor）。
+适用于任意 Git 仓库。Cursor、Trae、CodeBuddy 等 VS Code 兼容 IDE 均可从 VSIX 安装（优先保证 Cursor）。许可：[Apache License 2.0](LICENSE)。
 
 ---
 
@@ -25,15 +21,14 @@
 
 ## 安装
 
-1. 使用已打包的 `local-commit-guard-0.1.1.vsix`（与本目录同级，或自行打包生成）。
-2. **若已安装旧版**：先在扩展列表卸载 Local Commit Guard，命令面板执行 **Developer: Reload Window**，再装新 VSIX。同版本重装时 IDE 会缓存旧介绍，所以版本号会递增。
-3. IDE：扩展视图 → `...` → **Install from VSIX...** → 选择该文件。
-4. 安装后左侧活动栏会出现盾牌图标，点开即本插件界面。扩展列表中也会显示蓝色盾牌图标。
-5. 也可点状态栏 **禁止提交**，或命令面板搜索 `Local Commit Guard: 打开`。
-
-卸载后扩展列表应消失；若仍残留，再执行一次 **Reload Window**。重新安装会带上本 README 的最新介绍。
+1. 用 `npm run package` 生成 VSIX，或使用仓库旁已打好的安装包。
+2. IDE：扩展视图 → `...` → **Install from VSIX...** → 选择该文件。
+3. 安装后左侧活动栏会出现盾牌图标，点开即本插件界面。
+4. 也可点状态栏 **禁止提交**，或命令面板搜索 `Local Commit Guard: 打开`。
 
 工作区根目录不必是 Git 仓库。插件**不会**自动把工作区根当项目使用。
+
+若卸载后扩展列表仍有残留，命令面板执行 **Developer: Reload Window**。
 
 ---
 
@@ -77,10 +72,10 @@ workspace/                 ← 只是容器，不要选这个
 禁止提交 ≠ 禁止拉取。
 
 - 拉之前：**备份本地改动**（拷到当前仓库 `.git/local-commit-guard-vault/`，仅本机）。
-- 拉完若本地文件被远程覆盖：**从备份还原**。
+- 拉完若本地配置被远程覆盖：**从备份还原**。
 - **查看备份差异**：工作区与备份不一致时列出。
 
-建议：有本地未提交改动时先备份再 pull；默认吃远程新代码，需要本地版本再还原。不要用 skip-worktree 长期挡住拉取，否则远程修复进不来。
+建议：有本地未提交改动时先备份再 pull；默认吃远程新代码，需要本地版本再还原。
 
 ---
 
@@ -100,39 +95,42 @@ workspace/                 ← 只是容器，不要选这个
 
 ---
 
-## 本仓库（插件源码）结构
+## 本仓库结构
 
 ```text
 local-commit-guard/
-├── package.json              # 扩展清单：命令、引擎版本、打包脚本
-├── tsconfig.json             # TypeScript 编译到 out/
-├── .vscodeignore             # 打进 VSIX 时排除的文件
-├── README.md                 # 本说明
+├── package.json
+├── tsconfig.json
+├── .vscodeignore
+├── README.md
 ├── LICENSE
+├── NOTICE
+├── AUTHORS.md
+├── CONTRIBUTING.md
 ├── media/
-│   ├── icon.png              # 扩展列表 128×128 图标
-│   └── shield.svg            # 左侧活动栏图标
+│   ├── icon.png
+│   └── shield.svg
 ├── resources/
 │   ├── local-commit-guard.sh
-│   └── uninstall.js          # 卸载时清理残留扩展目录
+│   └── uninstall.js
 ├── scripts/
-│   ├── package.ps1           # npm install → 编译 → 测试 → 打 vsix
-│   └── test-matcher.js       # 短名匹配单测
+│   ├── package.ps1
+│   └── test-matcher.js
 ├── src/
-│   ├── extension.ts          # 激活：命令、状态栏、打开面板、自动移出暂存
-│   ├── panel.ts              # Webview 界面
-│   ├── bind.ts               # 手动绑定 Git 路径（不默认工作区根）
-│   ├── service.ts            # 应用规则、备份/还原入口
-│   ├── matcher.ts            # 短名 / 前缀匹配
-│   ├── git.ts                # 调用 git：status、暂存、unstage
-│   ├── store.ts              # 读写 .git 下 json / rules
-│   ├── hook.ts               # 把检查脚本装进 pre-commit
-│   ├── vault.ts              # 保险库拷贝与差异
+│   ├── extension.ts
+│   ├── panel.ts
+│   ├── bind.ts
+│   ├── service.ts
+│   ├── matcher.ts
+│   ├── git.ts
+│   ├── store.ts
+│   ├── hook.ts
+│   ├── vault.ts
 │   └── types.ts
-└── out/                      # tsc 产物（打进 VSIX）
+└── out/
 ```
 
-安装到 IDE 后，运行的是 VSIX 里的 `out/` + `resources/`，与你正在开发的业务仓库无关。业务仓库只多上述 `.git/local-commit-guard*` 文件。
+安装到 IDE 后运行的是 VSIX 里的 `out/` 与 `resources/`。业务仓库只多上述 `.git/local-commit-guard*` 文件。
 
 ---
 
@@ -148,26 +146,8 @@ npm run package
 
 或：`.\scripts\package.ps1`
 
-默认在 **上一级目录** 生成 `local-commit-guard-0.1.1.vsix`。
+生成的 VSIX 默认写在上一级目录。
 
 ---
 
-## 版权与二次开发
-
-- 原始作者：**insistin**（https://github.com/insistin）
-- 协议：Apache-2.0。他人可以 fork、修改、再发布，但必须保留 `LICENSE`、`NOTICE`、`AUTHORS.md` 中的原始作者信息。
-- 详见 [NOTICE](NOTICE)、[AUTHORS.md](AUTHORS.md)、[CONTRIBUTING.md](CONTRIBUTING.md)。
-
-## 发布到 GitHub
-
-在本目录（`local-commit-guard`）初始化并推到你的账号（需已登录 `gh` / `git`）：
-
-```powershell
-cd E:\workspace\plugins\local-commit-guard
-git init
-git add .
-git commit -m "Initial commit: Local Commit Guard by insistin"
-gh repo create local-commit-guard --public --source=. --remote=origin --push
-```
-
-仓库请建在 **https://github.com/insistin/local-commit-guard**，作为首次公开发布记录。
+Original author: [insistin](https://github.com/insistin)
