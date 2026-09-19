@@ -1,0 +1,98 @@
+{
+  "name": "local-commit-guard",
+  "displayName": "Local Commit Guard",
+  "description": "按路径黑名单禁止 Git 提交本地专用代码；拉取不拦截，本地改动可备份还原。",
+  "icon": "media/icon.png",
+  "version": "0.1.1",
+  "publisher": "insistin",
+  "author": {
+    "name": "insistin",
+    "url": "https://github.com/insistin"
+  },
+  "homepage": "https://github.com/insistin/local-commit-guard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/insistin/local-commit-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/insistin/local-commit-guard/issues"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "blacklist",
+    "local"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "localCommitGuard",
+          "title": "Local Commit Guard",
+          "icon": "media/shield.svg"
+        }
+      ]
+    },
+    "views": {
+      "localCommitGuard": [
+        {
+          "type": "webview",
+          "id": "localCommitGuard.sidebar",
+          "name": "禁止提交"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "localCommitGuard.open",
+        "title": "打开",
+        "category": "Local Commit Guard"
+      },
+      {
+        "command": "localCommitGuard.check",
+        "title": "查看将拦截的改动",
+        "category": "Local Commit Guard"
+      },
+      {
+        "command": "localCommitGuard.backup",
+        "title": "备份本地改动",
+        "category": "Local Commit Guard"
+      },
+      {
+        "command": "localCommitGuard.restore",
+        "title": "从备份还原",
+        "category": "Local Commit Guard"
+      },
+      {
+        "command": "localCommitGuard.apply",
+        "title": "确定并生效",
+        "category": "Local Commit Guard"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "vscode:uninstall": "node ./resources/uninstall.js",
+    "package": "npx --yes @vscode/vsce package --allow-missing-repository --out ../local-commit-guard-0.1.1.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+out/
+*.vsix
+.vscode-test/
+local-commit-guard-0.1.0.vsix
+
