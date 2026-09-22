@@ -4,14 +4,20 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
+import * as vscode from "vscode";
+import {
+  getBoundGitRoot,
+  resolveGitContext,
+} from "./bind";
 import {
   getChangedFiles,
   getStagedPaths,
+  stagePaths,
   unstagePaths,
 } from "./git";
 import { hookInstalled, installHook } from "./hook";
 import { pathMatchesAny, uniqueRules } from "./matcher";
-import { resolveGitContext } from "./bind";
 import { readStore, vaultPath, writeStore } from "./store";
 import { ClassifiedChange, GuardSnapshot } from "./types";
 import {
@@ -117,6 +123,98 @@ export async function unstageBlocked(
   }
   await unstagePaths(gitRoot, hit);
   return hit;
+}
+
+export async function stageAllowedOnly(
+  preferredRoot?: string
+): Promise<{ staged: string[]; skipped: string[]; unstaged: string[] }> {
+  const ctx = await resolveGitContext(preferredRoot);
+  if (!ctx) {
+    throw new Error("尚未选择 Git 仓库");
+  }
+  const store = readStore(ctx.gitDir);
+  if (!store.rules.length) {
+    throw new Error("还没有禁止提交的路径，请先添加并确定生效");
+  }
+  const rules = store.rules;
+  const unstaged = await unstageBlocked(ctx.gitRoot, rules);
+  const changes = await getChangedFiles(ctx.gitRoot);
+  const toStage: string[] = [];
+  const skipped: string[] = [];
+  const seen: { [k: string]: boolean } = {};
+  for (let i = 0; i < changes.length; i++) {
+    const c = changes[i];
+    const paths = c.oldPath ? [c.path, c.oldPath] : [c.path];
+    for (let j = 0; j < paths.length; j++) {
+      const p = paths[j];
+      if (seen[p]) {
+        continue;
+      }
+      seen[p] = true;
+      if (pathMatchesAny(p, rules)) {
+        if (skipped.indexOf(p) < 0) {
+          skipped.push(p);
+        }
+        continue;
+      }
+      if (toStage.indexOf(c.path) < 0) {
+        toStage.push(c.path);
+      }
+    }
+  }
+  const staged = await stagePaths(ctx.gitRoot, toStage);
+  return { staged, skipped, unstaged };
+}
+
+export async function listGuardGitRoots(
+  context: vscode.ExtensionContext
+): Promise<string[]> {
+  const roots: string[] = [];
+  const push = (r: string) => {
+    const n = path.resolve(r);
+    for (let i = 0; i < roots.length; i++) {
+      if (path.resolve(roots[i]).toLowerCase() === n.toLowerCase()) {
+        return;
+      }
+    }
+    roots.push(n);
+  };
+
+  const bound = getBoundGitRoot(context);
+  if (bound) {
+    push(bound);
+  }
+
+  try {
+    const gitExt = vscode.extensions.getExtension("vscode.git");
+    if (gitExt) {
+      if (!gitExt.isActive) {
+        await gitExt.activate();
+      }
+      const api = gitExt.exports && gitExt.exports.getAPI(1);
+      if (api && api.repositories) {
+        for (let i = 0; i < api.repositories.length; i++) {
+          const repo = api.repositories[i];
+          push(repo.rootUri.fsPath);
+        }
+      }
+    }
+  } catch {
+    /* git API optional */
+  }
+
+  const guarded: string[] = [];
+  for (let i = 0; i < roots.length; i++) {
+    const ctx = await resolveGitContext(roots[i]);
+    if (!ctx) {
+      continue;
+    }
+    const store = readStore(ctx.gitDir);
+    if (store.rules.length) {
+      guarded.push(ctx.gitRoot);
+    }
+  }
+  return guarded;
 }
 
 export async function backupNow(preferredRoot?: string) {

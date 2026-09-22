@@ -33,14 +33,35 @@ function guardHookPath(gitDir: string): string {
   return path.join(hooksDir(gitDir), "local-commit-guard.sh");
 }
 
+const HOOK_RESOURCES = ["local-commit-guard.sh"];
+const OBSOLETE_HOOKS = [
+  "local-commit-guard-add.sh",
+  "local-commit-guard-add.cmd",
+  "local-commit-guard-unstage-blocked.sh",
+  "local-commit-guard-unstage-blocked.cmd",
+  "local-commit-guard-watch.sh",
+  "local-commit-guard-watch.cmd",
+];
+
 export function installHook(gitDir: string, extensionRoot: string): void {
   const dir = hooksDir(gitDir);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  const src = path.join(extensionRoot, "resources", "local-commit-guard.sh");
-  const dest = guardHookPath(gitDir);
-  fs.copyFileSync(src, dest);
+  for (let i = 0; i < OBSOLETE_HOOKS.length; i++) {
+    const old = path.join(dir, OBSOLETE_HOOKS[i]);
+    if (fs.existsSync(old)) {
+      fs.unlinkSync(old);
+    }
+  }
+  for (let i = 0; i < HOOK_RESOURCES.length; i++) {
+    const name = HOOK_RESOURCES[i];
+    const src = path.join(extensionRoot, "resources", name);
+    if (!fs.existsSync(src)) {
+      continue;
+    }
+    fs.copyFileSync(src, path.join(dir, name));
+  }
 
   const pc = preCommitPath(gitDir);
   if (!fs.existsSync(pc)) {

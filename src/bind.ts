@@ -34,7 +34,40 @@ export async function saveBoundGitRoot(
     (p) => p.toLowerCase() !== gitRoot.toLowerCase()
   );
   recent.unshift(gitRoot);
-  await context.workspaceState.update(STATE_RECENT_ROOTS, recent.slice(0, 8));
+  await context.workspaceState.update(STATE_RECENT_ROOTS, recent.slice(0, 16));
+}
+
+interface RecentPick extends vscode.QuickPickItem {
+  gitRoot: string;
+}
+
+export async function pickRecentGitRoot(
+  context: vscode.ExtensionContext,
+  current?: string
+): Promise<string | undefined> {
+  const recent = getRecentGitRoots(context);
+  if (!recent.length) {
+    vscode.window.showInformationMessage("还没有绑定过的 Git 仓库。");
+    return undefined;
+  }
+  const items: RecentPick[] = recent.map((p) => {
+    const norm = p.replace(/\\/g, "/");
+    const slash = norm.lastIndexOf("/");
+    const name = slash >= 0 ? norm.slice(slash + 1) : norm;
+    const isCurrent =
+      !!current && path.resolve(current).toLowerCase() === path.resolve(p).toLowerCase();
+    return {
+      label: (isCurrent ? "$(check) " : "$(history) ") + name,
+      description: isCurrent ? "当前" : "",
+      detail: p,
+      gitRoot: p,
+    };
+  });
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: "最近绑定的 Git 仓库",
+    matchOnDetail: true,
+  });
+  return picked ? picked.gitRoot : undefined;
 }
 
 export function resolveUserPath(input: string): string {

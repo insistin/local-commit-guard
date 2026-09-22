@@ -6,7 +6,15 @@
 import * as vscode from "vscode";
 import { getBoundGitRoot } from "./bind";
 import { GuardPanel, GuardViewProvider } from "./panel";
-import { autoUnstageIfNeeded, backupNow, buildSnapshot, restoreNow } from "./service";
+import {
+  autoUnstageIfNeeded,
+  backupNow,
+  buildSnapshot,
+  listGuardGitRoots,
+  restoreNow,
+  stageAllowedOnly,
+} from "./service";
+import { runCheckAndUpdate } from "./update";
 
 let unstageTimer: NodeJS.Timeout | undefined;
 let lastUnstageToast = 0;
@@ -40,6 +48,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const apply = vscode.commands.registerCommand("localCommitGuard.apply", () => {
     void GuardPanel.show();
   });
+  const stageAllowed = vscode.commands.registerCommand(
+    "localCommitGuard.stageAllowed",
+    async () => {
+      try {
+        const root = getBoundGitRoot(context);
+        const r = await stageAllowedOnly(root);
+        const parts: string[] = [];
+        if (r.staged.length) {
+          parts.push("已暂存 " + r.staged.length + " 个");
+        }
+        if (r.skipped.length) {
+          parts.push("跳过黑名单 " + r.skipped.length + " 个");
+        }
+        if (r.unstaged.length) {
+          parts.push("移出暂存 " + r.unstaged.length + " 个");
+        }
+        vscode.window.showInformationMessage(
+          "Local Commit Guard: " +
+            (parts.length ? parts.join("，") + "。" : "没有可暂存的改动。")
+        );
+      } catch (e: any) {
+        vscode.window.showErrorMessage(
+          "Local Commit Guard: " + (e && e.message ? e.message : String(e))
+        );
+      }
+    }
+  );
   const restore = vscode.commands.registerCommand(
     "localCommitGuard.restore",
     async () => {
@@ -64,6 +99,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }
   );
+  const openRecent = vscode.commands.registerCommand(
+    "localCommitGuard.openRecent",
+    async () => {
+      await GuardPanel.show();
+      if (GuardViewProvider.current) {
+        await GuardViewProvider.current.openRecent();
+      }
+    }
+  );
+  const checkUpdate = vscode.commands.registerCommand(
+    "localCommitGuard.checkUpdate",
+    async () => {
+      try {
+        await runCheckAndUpdate(context);
+      } catch (e: any) {
+        vscode.window.showErrorMessage(
+          "Local Commit Guard: 检查更新失败 — " +
+            (e && e.message ? e.message : String(e))
+        );
+      }
+    }
+  );
 
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
@@ -81,7 +138,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
-  context.subscriptions.push(open, check, backup, apply, restore, status);
+  context.subscriptions.push(
+    open,
+    check,
+    backup,
+    apply,
+    stageAllowed,
+    restore,
+    checkUpdate,
+    openRecent,
+    status
+  );
 
   await refreshStatus(status, context);
   watchGit(context);
@@ -120,24 +187,30 @@ function watchGit(context: vscode.ExtensionContext): void {
     }
     unstageTimer = setTimeout(() => {
       void (async () => {
-        const root = getBoundGitRoot(context);
-        if (!root) {
+        const roots = await listGuardGitRoots(context);
+        if (!roots.length) {
           return;
         }
-        const hit = await autoUnstageIfNeeded(root);
-        if (hit.length > 0) {
+        const allHit: string[] = [];
+        for (let i = 0; i < roots.length; i++) {
+          const hit = await autoUnstageIfNeeded(roots[i]);
+          for (let j = 0; j < hit.length; j++) {
+            allHit.push(hit[j]);
+          }
+        }
+        if (allHit.length > 0) {
           const now = Date.now();
           if (now - lastUnstageToast > 4000) {
             lastUnstageToast = now;
             vscode.window.showWarningMessage(
-              "Local Commit Guard: 已从暂存区移出 " +
-                hit.length +
-                " 个禁止提交文件。"
+              "Local Commit Guard: 黑名单路径未加入暂存区（已移出 " +
+                allHit.length +
+                " 个）。"
             );
           }
         }
       })();
-    }, 400);
+    }, 120);
   };
   const start = () => {
     try {

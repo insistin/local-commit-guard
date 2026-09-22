@@ -160,6 +160,21 @@ export async function unstagePaths(
   return done;
 }
 
+export async function stagePaths(
+  gitRoot: string,
+  relPaths: string[]
+): Promise<string[]> {
+  const done: string[] = [];
+  for (let i = 0; i < relPaths.length; i++) {
+    const p = relPaths[i];
+    const res = await git(["add", "--", p], gitRoot);
+    if (res.code === 0) {
+      done.push(p);
+    }
+  }
+  return done;
+}
+
 export function walkUpFindGit(startDir: string): string | null {
   let current = path.resolve(startDir);
   for (let i = 0; i < 40; i++) {

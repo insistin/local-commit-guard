@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copyright 2026 insistin (https://github.com/insistin)
 # SPDX-License-Identifier: Apache-2.0
-# local-commit-guard: reject staged paths matching .git/local-commit-guard.rules
+# local-commit-guard: keep blacklist paths out of commits (unstage on commit if needed)
 # Installed by the Local Commit Guard VS Code / Cursor extension.
 
 set -e
@@ -29,7 +29,6 @@ check_path() {
       ""|\#*) continue ;;
     esac
     rule=$(printf '%s' "$rule" | tr '\\' '/')
-    # trim leading/trailing slashes
     while [ "${rule#/}" != "$rule" ]; do
       rule=${rule#/}
     done
@@ -42,6 +41,11 @@ check_path() {
     esac
   done < "$RULES"
   return 1
+}
+
+unstage_path() {
+  f=$1
+  git restore --staged -- "$f" 2>/dev/null || git reset -q HEAD -- "$f" 2>/dev/null || true
 }
 
 tmpfile="${TMPDIR:-/tmp}/lcg-$$.txt"
@@ -64,16 +68,22 @@ while IFS= read -r f || [ -n "$f" ]; do
   if check_path "$f"; then
     blocked="$blocked$f
 "
+    unstage_path "$f"
   fi
 done < "$tmpfile"
 
 rm -f "$tmpfile" "$seen_file"
 
 if [ -n "$blocked" ]; then
-  echo "Local Commit Guard: 以下路径已禁止提交（黑名单）：" >&2
+  remaining=$(git diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$remaining" = "0" ] || [ -z "$remaining" ]; then
+    echo "Local Commit Guard: 以下路径已禁止提交（黑名单）：" >&2
+    printf '%s' "$blocked" >&2
+    echo "暂存区没有可提交的文件。" >&2
+    exit 1
+  fi
+  echo "Local Commit Guard: 以下路径未加入本次提交（已从暂存区移出）：" >&2
   printf '%s' "$blocked" >&2
-  echo "请从暂存区移除这些文件后再提交，或在插件中删除对应规则。" >&2
-  exit 1
 fi
 
 exit 0
